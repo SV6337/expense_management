@@ -1,0 +1,151 @@
+/* App-level styling integrated with global theme */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #080c14;
+  position: relative;
+  z-index: 1;
+}
+
+.container {
+  flex: 1;
+  padding: 32px 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Generic glassmorphic styling */
+.glass {
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+  border-radius: 16px !important;
+}
+
+/* Balance, Income/Expense Cards */
+.balance-section {
+  text-align: center;
+  padding: 32px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.balance-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.balance-amount {
+  font-size: 48px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+  letter-spacing: -1px;
+}
+
+/* Delete button and fade-out animation */
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: color 180ms ease, transform 180ms ease;
+  font-size: 16px;
+}
+
+.delete-btn:hover {
+  color: #ef4444;
+  transform: scale(1.06);
+}
+
+.fade-out {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+/* Glassmorphic select styling */
+.glass-select {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  outline: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.glass-select:focus {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2), 
+              0 0 20px rgba(96, 165, 250, 0.3) !important;
+}
+
+.form-control input,
+.form-control select {
+  width: 100%;
+  padding: 12px 16px !important;
+  margin-top: 6px;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  transition: all 0.3s ease !important;
+}
+
+.form-control input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.form-control input:focus,
+.form-control select:focus {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2), 
+              0 0 20px rgba(96, 165, 250, 0.3) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 16px;
+    gap: 20px;
+  }
+
+  .balance-amount {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .balance-amount {
+    font-size: 28px;
+  }
+}
