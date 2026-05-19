@@ -1,6 +1,8 @@
 import React, { createContext, useReducer, useEffect } from 'react';
 import axios from 'axios';
 import authReducer from './authReducer';
+// Import your centralized API Base URL variable
+import API_BASE_URL from '../config/api'; 
 
 const initialState = {
   user: null,
@@ -12,7 +14,9 @@ export const AuthContext = createContext(initialState);
 
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const API_BASE = '/api/v1/auth';
+  
+  // Cleanly wire the auth route prefix to your production NodePort string
+  const API_BASE = `${API_BASE_URL}/auth`;
 
   // Initialize user from localStorage on mount
   useEffect(() => {
