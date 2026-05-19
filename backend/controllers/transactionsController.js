@@ -1,11 +1,29 @@
 const Transaction = require('../models/Transaction');
+const {
+  safeRedisGet,
+  safeRedisSet,
+  safeRedisDel
+} = require('../config/redis');
+
+const getTransactionsCacheKey = (userId) => `transactions:${userId}`;
 
 // @desc    Get all transactions
 // @route   GET /api/v1/transactions
 // @access  Private
 exports.getTransactions = async (req, res, next) => {
   try {
+    const cacheKey = getTransactionsCacheKey(req.user.id);
+    const cachedTransactions = await safeRedisGet(cacheKey);
+
+    if (cachedTransactions) {
+      const data = JSON.parse(cachedTransactions);
+      return res.status(200).json({ success: true, count: data.length, data });
+    }
+
     const transactions = await Transaction.find({ user: req.user.id }).sort({ createdAt: -1 });
+
+    await safeRedisSet(cacheKey, JSON.stringify(transactions), 60);
+
     return res.status(200).json({ success: true, count: transactions.length, data: transactions });
   } catch (err) {
     next(err);
@@ -19,6 +37,7 @@ exports.addTransaction = async (req, res, next) => {
   try {
     const { text, amount, category } = req.body;
     const transaction = await Transaction.create({ user: req.user.id, text, amount, category });
+    await safeRedisDel(getTransactionsCacheKey(req.user.id));
     return res.status(201).json({ success: true, data: transaction });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -39,6 +58,7 @@ exports.deleteTransaction = async (req, res, next) => {
     if (!transaction) {
       return res.status(404).json({ success: false, error: 'Transaction not found' });
     }
+    await safeRedisDel(getTransactionsCacheKey(req.user.id));
     return res.status(200).json({ success: true, data: transaction });
   } catch (err) {
     next(err);

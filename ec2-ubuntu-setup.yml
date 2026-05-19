@@ -1,0 +1,128 @@
+---
+- name: Prepare Ubuntu EC2 for Docker and K3s
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    swap_file_path: /swapfile
+    swap_file_size_mb: 4096
+    swap_file_reserved_mb: 512
+    swap_file_min_mb: 256
+    k3s_min_mb: 2048
+    swap_swappiness: 10
+    k3s_disable_traefik_flag: "--disable traefik"
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - docker.io
+          - docker-compose-v2
+        state: present
+
+    - name: Ensure Docker service is enabled and started
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Check whether swap file exists
+      ansible.builtin.stat:
+        path: "{{ swap_file_path }}"
+      register: swap_file_stat
+
+    - name: Check available space on the root filesystem
+      ansible.builtin.command:
+        cmd: df -Pm /
+      register: root_df
+      changed_when: false
+
+    - name: Calculate safe swap file size
+      ansible.builtin.set_fact:
+        root_available_mb: "{{ root_df.stdout_lines[1].split()[3] | int }}"
+        swap_target_mb: "{{ [swap_file_size_mb, (root_df.stdout_lines[1].split()[3] | int) - swap_file_reserved_mb] | min }}"
+        swap_should_manage: "{{ (root_df.stdout_lines[1].split()[3] | int) >= (swap_file_reserved_mb + swap_file_min_mb) }}"
+        k3s_should_install: "{{ (root_df.stdout_lines[1].split()[3] | int) >= k3s_min_mb }}"
+
+    - name: Warn when there is not enough space for a new swap file
+      ansible.builtin.debug:
+        msg: >-
+          Skipping swap creation because the root disk is too full.
+          Available MB: {{ root_available_mb }}, required minimum: {{ swap_file_reserved_mb + swap_file_min_mb }}.
+          The playbook will continue without creating or modifying swap.
+     
+
+    - name: Manage swap file when enough disk space is available
+      when: swap_should_manage | bool
+      block:
+        - name: Remove existing swap file when the size is different
+          ansible.builtin.command:
+            cmd: "swapoff {{ swap_file_path }}"
+          when: swap_file_stat.stat.exists and (swap_file_stat.stat.size | int) != ((swap_target_mb | int) * 1024 * 1024)
+          failed_when: false
+
+        - name: Delete existing swap file when the size is different
+          ansible.builtin.file:
+            path: "{{ swap_file_path }}"
+            state: absent
+          when: swap_file_stat.stat.exists and (swap_file_stat.stat.size | int) != ((swap_target_mb | int) * 1024 * 1024)
+
+        - name: Create swap file on local storage
+          ansible.builtin.command:
+            cmd: "dd if=/dev/zero of={{ swap_file_path }} bs=1M count={{ swap_target_mb }}"
+          when: not swap_file_stat.stat.exists or (swap_file_stat.stat.size | int) != ((swap_target_mb | int) * 1024 * 1024)
+
+        - name: Set secure permissions on swap file
+          ansible.builtin.file:
+            path: "{{ swap_file_path }}"
+            owner: root
+            group: root
+            mode: '0600'
+
+        - name: Format swap file
+          ansible.builtin.command:
+            cmd: "mkswap {{ swap_file_path }}"
+          when: not swap_file_stat.stat.exists or (swap_file_stat.stat.size | int) != ((swap_target_mb | int) * 1024 * 1024)
+
+        - name: Enable swap file immediately
+          ansible.builtin.command:
+            cmd: "swapon {{ swap_file_path }}"
+          when: not swap_file_stat.stat.exists or (swap_file_stat.stat.size | int) != ((swap_target_mb | int) * 1024 * 1024)
+
+        - name: Persist swap file in fstab
+          ansible.builtin.lineinfile:
+            path: /etc/fstab
+            line: "{{ swap_file_path }} none swap sw 0 0"
+            state: present
+
+        - name: Configure vm.swappiness for active swap usage
+          ansible.builtin.sysctl:
+            name: vm.swappiness
+            value: "{{ swap_swappiness }}"
+            state: present
+            sysctl_set: true
+            reload: true
+
+    - name: Warn when there is not enough space for K3s
+      ansible.builtin.debug:
+        msg: >-
+          Skipping K3s installation because the root disk is too full.
+          Available MB: {{ root_available_mb }}, required minimum: {{ k3s_min_mb }}.
+          The playbook will continue without K3s.
+      
+
+    - name: Install K3s without Traefik to reduce memory usage
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | sh -s - {{ k3s_disable_traefik_flag }}
+      args:
+        executable: /bin/bash
+        creates: /usr/local/bin/k3s
+      
