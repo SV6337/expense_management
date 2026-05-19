@@ -1,6 +1,7 @@
 import React, { createContext, useReducer, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import AppReducer from './AppReducer';
+import { TRANSACTIONS_API } from '../config/api';
 
 const initialState = {
   transactions: [],
@@ -14,9 +15,6 @@ export const GlobalProvider = ({ children }) => {
   const [state, dispatch] = useReducer(AppReducer, initialState);
   const { user } = useAuth();
 
-  // Fetch transactions
-  const API_BASE = '/api/v1/transactions';
-
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -24,7 +22,7 @@ export const GlobalProvider = ({ children }) => {
 
   const getTransactions = useCallback(async () => {
     try {
-      const res = await fetch(API_BASE, {
+      const res = await fetch(TRANSACTIONS_API, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -33,12 +31,12 @@ export const GlobalProvider = ({ children }) => {
     } catch (err) {
       dispatch({ type: 'TRANSACTION_ERROR', payload: err.message });
     }
-  }, [API_BASE]);
+  }, []);
 
   // Add transaction
   const addTransaction = async (transaction) => {
     try {
-      const res = await fetch(API_BASE, {
+      const res = await fetch(TRANSACTIONS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(transaction)
@@ -54,7 +52,7 @@ export const GlobalProvider = ({ children }) => {
   // Delete transaction by ID from backend and update state
   const deleteTransaction = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/${id}`, {
+      const res = await fetch(`${TRANSACTIONS_API}/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });

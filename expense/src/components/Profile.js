@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { AUTH_API } from '../config/api';
 import './Profile.css';
 
 export default function Profile({ onNavigate }) {
@@ -36,7 +37,7 @@ export default function Profile({ onNavigate }) {
       setPasswordVerification(prev => ({ ...prev, isVerifying: true }));
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/v1/auth/verify-password', {
+        const response = await fetch(`${AUTH_API}/verify-password`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
