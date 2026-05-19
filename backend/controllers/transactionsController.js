@@ -13,20 +13,57 @@ const getTransactionsCacheKey = (userId) => `transactions:${userId}`;
 exports.getTransactions = async (req, res, next) => {
   try {
     const cacheKey = getTransactionsCacheKey(req.user.id);
-    const cachedTransactions = await safeRedisGet(cacheKey);
 
-    if (cachedTransactions) {
-      const data = JSON.parse(cachedTransactions);
-      return res.status(200).json({ success: true, count: data.length, data });
+    // Attempt to read from Redis cache, but don't let Redis failures block DB access
+    let cachedTransactions = null;
+    try {
+      cachedTransactions = await safeRedisGet(cacheKey);
+    } catch (redisErr) {
+      console.error(`Redis GET error for key ${cacheKey}:`, redisErr && (redisErr.stack || redisErr.message || redisErr));
+      cachedTransactions = null;
     }
 
-    const transactions = await Transaction.find({ user: req.user.id }).sort({ createdAt: -1 });
+    if (cachedTransactions) {
+      try {
+        const data = JSON.parse(cachedTransactions);
+        if (Array.isArray(data)) {
+          return res.status(200).json({ success: true, count: data.length, data });
+        }
+        console.warn(`Cached transactions for key ${cacheKey} are not an array; falling back to MongoDB`);
+      } catch (parseErr) {
+        console.error(`Failed to parse cached transactions for key ${cacheKey}:`, parseErr && (parseErr.stack || parseErr.message || parseErr));
+      }
+    }
 
-    await safeRedisSet(cacheKey, JSON.stringify(transactions), 60);
+    // Primary DB query
+    let transactions;
+    try {
+      transactions = await Transaction.find({ user: req.user.id }).sort({ createdAt: -1 }).lean();
+    } catch (dbErr) {
+      console.error(`Primary MongoDB query failed for user ${req.user.id}:`, dbErr && (dbErr.stack || dbErr.message || dbErr));
+
+      // Graceful fallback: try a simpler query in case of an unexpected state
+      try {
+        transactions = await Transaction.find({ user: req.user.id }).lean();
+      } catch (dbErr2) {
+        console.error(`Fallback MongoDB query also failed for user ${req.user.id}:`, dbErr2 && (dbErr2.stack || dbErr2.message || dbErr2));
+        return res.status(500).json({ success: false, error: 'Failed to retrieve transactions' });
+      }
+    }
+
+    if (!transactions) transactions = [];
+
+    // Attempt to populate cache but don't fail the request if cache write fails
+    try {
+      await safeRedisSet(cacheKey, JSON.stringify(transactions), 60);
+    } catch (cacheSetErr) {
+      console.error(`Redis SET failed for key ${cacheKey}:`, cacheSetErr && (cacheSetErr.stack || cacheSetErr.message || cacheSetErr));
+    }
 
     return res.status(200).json({ success: true, count: transactions.length, data: transactions });
   } catch (err) {
-    next(err);
+    console.error('Unexpected error in getTransactions:', err && (err.stack || err.message || err));
+    return res.status(500).json({ success: false, error: 'Server Error' });
   }
 };
 
