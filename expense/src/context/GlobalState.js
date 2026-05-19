@@ -1,4 +1,5 @@
 import React, { createContext, useReducer, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { useAuth } from '../hooks/useAuth';
 import AppReducer from './AppReducer';
 import API_BASE_URL from '../config/api';
@@ -25,52 +26,45 @@ export const GlobalProvider = ({ children }) => {
   const getTransactions = useCallback(async () => {
     try {
       console.debug('GET transactions from', API_BASE);
-      const res = await fetch(API_BASE, {
-        headers: getAuthHeaders()
-      });
-      console.debug('GET transactions response status', res.status);
-      const data = await res.json();
+      const res = await axios.get(API_BASE, { headers: getAuthHeaders() });
+      const data = res.data;
       console.debug('GET transactions response data', data);
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
+      if (!data || data.success === false) throw new Error(data.error || 'Failed to fetch');
       dispatch({ type: 'GET_TRANSACTIONS', payload: data.data });
     } catch (err) {
       console.error('getTransactions error', err);
-      dispatch({ type: 'TRANSACTION_ERROR', payload: err.message });
+      const msg = err.response?.data?.error || err.message || 'Failed to fetch';
+      dispatch({ type: 'TRANSACTION_ERROR', payload: msg });
     }
   }, []);
 
   // Add transaction
   const addTransaction = async (transaction) => {
     try {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify(transaction)
+      const res = await axios.post(API_BASE, transaction, {
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(Array.isArray(data.error) ? data.error.join(', ') : data.error || 'Failed to add');
+      const data = res.data;
+      if (!data || data.success === false) throw new Error(Array.isArray(data.error) ? data.error.join(', ') : data.error || 'Failed to add');
       // Ensure UI reflects latest DB state by re-fetching transactions
       dispatch({ type: 'ADD_TRANSACTION', payload: data.data });
       try {
         await getTransactions();
       } catch (err) {
-        // silently ignore; we've already optimistically added the transaction
         console.warn('Could not refresh transactions after add:', err);
       }
     } catch (err) {
-      dispatch({ type: 'TRANSACTION_ERROR', payload: err.message });
+      const msg = err.response?.data?.error || err.message || 'Failed to add';
+      dispatch({ type: 'TRANSACTION_ERROR', payload: msg });
     }
   };
 
   // Delete transaction by ID from backend and update state
   const deleteTransaction = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete');
+      const res = await axios.delete(`${API_BASE}/${id}`, { headers: getAuthHeaders() });
+      const data = res.data;
+      if (!data || data.success === false) throw new Error(data.error || 'Failed to delete');
       // Dispatch action to remove from state (triggers Balance, IncomeExpenses, TransactionList re-render)
       dispatch({ type: 'DELETE_TRANSACTION', payload: id });
       try {
@@ -80,7 +74,8 @@ export const GlobalProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Delete error:', err);
-      dispatch({ type: 'TRANSACTION_ERROR', payload: err.message });
+      const msg = err.response?.data?.error || err.message || 'Failed to delete';
+      dispatch({ type: 'TRANSACTION_ERROR', payload: msg });
     }
   };
 
