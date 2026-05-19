@@ -17,6 +17,9 @@ spec:
         image: sv6337/expense-backend:latest
         ports:
         - containerPort: 5000
+        env:
+        - name: MONGO_URI
+          value: "mongodb+srv://1hindurastra_db_user:rn7pcs6337@cluster0.cc7ogbu.mongodb.net/test?appName=Cluster0"
 ---
 apiVersion: v1
 kind: Service
